@@ -1,37 +1,63 @@
+// server.js
 const express = require('express');
-const app = express();
 const cors = require('cors');
+const app = express();
+const port = process.env.PORT || 3000;
 
-// Enable CORS for the frontend dashboard
+// Enable CORS for all origins
 app.use(cors());
+app.use(express.json());
+
+// Store connected clients
+let clients = [];
+let latestData = {
+    temperature: 0,
+    humidity: 0,
+    light: 0,
+    waterLevel: 0,
+    fanStatus: false,
+    ledStatus: false,
+    tankStatus: ''
+};
 
 // SSE endpoint
 app.get('/events', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+    });
 
-  // Send data every second
-  setInterval(() => {
-    const data = {
-      temperature: 0,  // Placeholder, will be updated by ESP32
-      humidity: 0,     // Placeholder
-      light: 0,        // Placeholder
-      water: 0,        // Placeholder
-      fanStatus: 'OFF',  // Placeholder
-      ledStatus: 'OFF',  // Placeholder
-      tankStatus: 'Full', // Placeholder
+    const clientId = Date.now();
+    const newClient = {
+        id: clientId,
+        response: res
     };
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-  }, 1000);
+    
+    clients.push(newClient);
+    res.write(`data: ${JSON.stringify(latestData)}\n\n`);
+
+    req.on('close', () => {
+        clients = clients.filter(client => client.id !== clientId);
+    });
 });
 
-// Serve static files (e.g., your HTML dashboard)
-app.use(express.static('public'));
+// Endpoint for ESP32 data
+app.post('/sensor-data', (req, res) => {
+    latestData = req.body;
+    
+    clients.forEach(client => {
+        client.response.write(`data: ${JSON.stringify(latestData)}\n\n`);
+    });
+    
+    res.json({ success: true });
+});
 
-// Start the server
-const port = process.env.PORT || 3000;
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+    res.json({ status: 'healthy' });
+});
+
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+    console.log(`Server running on port ${port}`);
 });
