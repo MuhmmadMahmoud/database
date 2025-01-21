@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const cors = require('cors');
 const app = express();
@@ -16,8 +17,7 @@ let latestData = {
     waterLevel: 0,
     fanStatus: false,
     ledStatus: false,
-    tankStatus: '',
-    pumpStatus: false  // Added pump status
+    tankStatus: ''
 };
 
 // SSE endpoint
@@ -46,39 +46,18 @@ app.get('/events', (req, res) => {
 app.post('/sensor-data', (req, res) => {
     latestData = req.body;
     
-    // Log received data for debugging
-    console.log('Received sensor data:', latestData);
-    
     clients.forEach(client => {
         client.response.write(`data: ${JSON.stringify(latestData)}\n\n`);
     });
     
-    res.json({ 
-        success: true,
-        message: 'Data received and broadcasted to all clients'
-    });
+    res.json({ success: true });
 });
 
 // Health check endpoint for Render
 app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        connectedClients: clients.length
-    });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Server error:', err);
-    res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: err.message
-    });
+    res.json({ status: 'healthy' });
 });
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
-    console.log(`Health check available at /health`);
 });
